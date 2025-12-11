@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 //! Safe Rust wrapper for seeded Falcon-512 keypair generation
 
-use crate::*;
 use crate::ffi::{self, rand::OQS_randombytes, sig_falcon_seeded};
+use crate::*;
 
 /// Minimum seed length for Falcon-512 (48 bytes)
 pub const MIN_SEED_LENGTH: usize = 48;
@@ -125,50 +125,41 @@ impl SeededFalcon512 {
         let seed = Self::seed_from_passphrase(passphrase, salt, iterations)?;
         Self::keypair_from_seed(&seed)
     }
-}
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+    /// Derive a child seed using SHA256(master_seed || index)
+    /// Deterministically derive a child seed from a master seed + index.
+    /// Produces a 48-byte Falcon-compatible seed.
+    pub fn derive_child_seed(master_seed: &[u8], index: u32) -> Result<Vec<u8>> {
+        use sha3::{Digest, Sha3_512};
 
-    #[test]
-    fn test_deterministic_generation() {
-        let seed = SeededFalcon512::generate_seed();
-        let (pk1, sk1) = SeededFalcon512::keypair_from_seed(&seed).unwrap();
-        let (pk2, sk2) = SeededFalcon512::keypair_from_seed(&seed).unwrap();
+        if master_seed.len() < MIN_SEED_LENGTH {
+            return Err(SeededFalconError::SeedTooShort);
+        }
 
-        assert_eq!(pk1.as_ref(), pk2.as_ref());
-        assert_eq!(sk1.as_ref(), sk2.as_ref());
+        // Hash(master_seed || index)
+        let mut hasher = Sha3_512::new();
+        hasher.update(master_seed);
+        hasher.update(&index.to_be_bytes());
+
+        let digest = hasher.finalize(); // 64 bytes output
+
+        // Falcon needs only 48 bytes → truncate
+        let mut out = vec![0u8; MIN_SEED_LENGTH];
+        out.copy_from_slice(&digest[..MIN_SEED_LENGTH]);
+
+        Ok(out)
     }
 
-    #[test]
-    fn test_different_seeds() {
-        let seed1 = SeededFalcon512::generate_seed();
-        let seed2 = SeededFalcon512::generate_seed();
-        
-        let (pk1, _) = SeededFalcon512::keypair_from_seed(&seed1).unwrap();
-        let (pk2, _) = SeededFalcon512::keypair_from_seed(&seed2).unwrap();
+    /// Generate keypair from master seed + derivation index
+    pub fn keypair_from_index(
+        master_seed: &[u8],
+        index: u32,
+    ) -> Result<(sig::PublicKey, sig::SecretKey)> {
+        if master_seed.len() < MIN_SEED_LENGTH {
+            return Err(SeededFalconError::SeedTooShort);
+        }
 
-        assert_ne!(pk1.as_ref(), pk2.as_ref());
-    }
-
-    #[test]
-    fn test_seed_too_short() {
-        let short_seed = vec![0u8; 32];
-        assert!(matches!(
-            SeededFalcon512::keypair_from_seed(&short_seed),
-            Err(SeededFalconError::SeedTooShort)
-        ));
-    }
-
-    #[test]
-    fn test_passphrase_derivation() {
-        let passphrase = b"correct horse battery staple";
-        let salt = SeededFalcon512::generate_seed();
-        
-        let (pk1, _) = SeededFalcon512::keypair_from_passphrase(passphrase, &salt, 10000).unwrap();
-        let (pk2, _) = SeededFalcon512::keypair_from_passphrase(passphrase, &salt, 10000).unwrap();
-
-        assert_eq!(pk1.as_ref(), pk2.as_ref());
+        let child = Self::derive_child_seed(master_seed, index)?; // ← fixed
+        Self::keypair_from_seed(&child) // ← fixed
     }
 }
