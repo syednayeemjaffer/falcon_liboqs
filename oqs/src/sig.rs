@@ -15,6 +15,7 @@ use std::ffi::CStr;
 use crate::ffi::sig as ffi;
 use crate::newtype_buffer;
 use crate::*;
+mod falcon_seeded;
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -202,9 +203,9 @@ implement_sigs! {
     ("cross") CrossRsdpg256Balanced: OQS_SIG_alg_cross_rsdpg_256_balanced,
     ("cross") CrossRsdpg256Fast: OQS_SIG_alg_cross_rsdpg_256_fast,
     ("cross") CrossRsdpg256Small: OQS_SIG_alg_cross_rsdpg_256_small,
-    ("dilithium") Dilithium2: OQS_SIG_alg_dilithium_2,
-    ("dilithium") Dilithium3: OQS_SIG_alg_dilithium_3,
-    ("dilithium") Dilithium5: OQS_SIG_alg_dilithium_5,
+    // ("dilithium") Dilithium2: OQS_SIG_alg_dilithium_2,
+    // ("dilithium") Dilithium3: OQS_SIG_alg_dilithium_3,
+    // ("dilithium") Dilithium5: OQS_SIG_alg_dilithium_5,
     ("falcon") Falcon512: OQS_SIG_alg_falcon_512,
     ("falcon") Falcon1024: OQS_SIG_alg_falcon_1024,
     ("mayo") Mayo1: OQS_SIG_alg_mayo_1,
@@ -552,3 +553,5 @@ impl Sig {
         status_to_result(status)
     }
 }
+
+pub use falcon_seeded::{SeededFalcon512, MIN_SEED_LENGTH};

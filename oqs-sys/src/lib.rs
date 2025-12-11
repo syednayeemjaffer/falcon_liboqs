@@ -35,3 +35,5 @@ pub mod sig {
     pub use super::common::OQS_STATUS;
     include!(concat!(env!("OUT_DIR"), "/sig_bindings.rs"));
 }
+/// ADD THIS LINE BELOW ALL OTHER MODULES
+pub mod sig_falcon_seeded;
